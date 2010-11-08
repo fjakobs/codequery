@@ -2,13 +2,15 @@ var parser = require("./treec");
 var pu = require('./parseutil');
 
 var n = Date.now();
-var files = pu.loadFiles("./apf", /\.js$/, /\_old/);
+//var files = pu.loadFiles("./apf", /\.js$/, /\_old/);
+var files = pu.loadFiles("../o3", /\.h$/, /\_old/, "c");
 
 console.log(Date.now() - n);
 
 // lets go and find our declare shit
-for(var i = 10;i<files.length;i++){
+for(var i = 391;i<files.length;i++){
     var f = files[i];
+    
     var n = f.root.scan("define([$a], function($b){$c})");
 	if(n.nt){
 	    var v = n.found;
@@ -18,7 +20,7 @@ for(var i = 10;i<files.length;i++){
         v.a.pn.remove(3);
         v.b.replace("require, exports, module");
         n.ns.fc.scan("function").replacews("");
-        v.c.scan("return").replace("module.exports = ",1);
+        v.c.scan("return").replace("module.exports = ", 1);
         
         for(var i = 0; i < args.length; i++)
             v.c.before( (i==0?"\n":"") + "    var " + args[i] + " = require(" + deps[i] + ");\n");

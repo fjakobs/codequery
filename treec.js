@@ -171,10 +171,11 @@
             return n;
         }        
         
-        function search(what, deep, all){
-            var set = [this];
-            if(!this.nt)
+        function search(where, what, deep, all){
+            if(!where.nt)
                 return all?[]:end;
+            
+            var set = [this];
             if(what.constructor == RegExp){
                var res = [];
                for(var i = 0;i<set.length;i++){
@@ -185,6 +186,7 @@
     			var args = what.split("#");
     			for(var i = 0;i<args.length;i++){
     	    		var nw = parse(args[i],{noEOF:1});
+    	    		console.log(nw.dump());
     	    		var set2 = [];
     	    		for(var j = 0;j<set.length;j++){
     	    			set2.push.apply(set2, scan(set[j], nw, 0));
@@ -196,19 +198,19 @@
         }
         
         this.scan = function(what){
-            return search(what, 0, 0);
+            return search(this, what, 0, 0);
         }
         
         this.scanAll = function(what){
-            return search(what, 0, 1);
+            return search(this, what, 0, 1);
         }
         
         this.find = function(what){
-            return search(what, 2, 0);
+            return search(this, what, 2, 0);
         }
         
         this.findAll = function(what){
-            return search(what, 2, 1);
+            return search(this, what, 2, 1);
         }
          
         // split, does a token based split and serializes each chunk into an output array
@@ -349,7 +351,7 @@
         "=":4,"!=":4,"<=":4,"->":4,">=":4,"<":4,">":4,"&&":4,"?":4,":":4,"::":4,
         "*=":4,"%=":4,"+=":4,"-=":4,";":4,"<<":4,">>":4,"<<=":4,">>=":4,",":4,":":4,
         "new":4, "typeof":4, "delete":4,"sizeof":4,
-        "namespace":5,"union":5,"struct":5,"class":5,"enum":5,"goto":5,
+        "namespace":5,"union":5,"struct":5,"class":5,"enum":5,"goto":5,"template":5,
         "break":5,"case":5,"catch":5,"continue":5,"default":5,"do":5,"else":5,
         "finally":5,"for":5,"function":5,"if":5,"return":5,"switch":5,"throw":5,
         "try":5,"typeof":5,"var":5,"while":5,"with":5,
@@ -381,7 +383,7 @@
             keywords = opts.keywords || exports.jskeywords,
             commentInDOM = opts.commentInDOM,
             dontEatSemi = opts.dontEatSemi;
-        
+        console.log(dontEatSemi);
         rx.lastIndex = 0;
         var root = new node(1,0,0,"","",end,end), n = root, b = 0, 
             t = 0, mode = 0, line = 0, err = [], ws = "",  ltok = null, m; 
@@ -423,7 +425,7 @@
                         else n.nt = 1;
                         break;
                     case 11: // eat ; into ws if we are not in ()
-                       if(dontEatSemi || tok==';' && (!n.pn || n.pn.nv!='('))
+                       if(!dontEatSemi && tok==';' && (!n.pn || n.pn.nv!='('))
                             ws = n.ws + tok, n = n.ps, n.ns = end, line++;
                        else // store operator type
                            n.nt = keywords[tok] || 11;
