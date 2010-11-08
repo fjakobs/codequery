@@ -383,7 +383,7 @@
             keywords = opts.keywords || exports.jskeywords,
             commentInDOM = opts.commentInDOM,
             dontEatSemi = opts.dontEatSemi;
-        console.log(dontEatSemi);
+
         rx.lastIndex = 0;
         var root = new node(1,0,0,"","",end,end), n = root, b = 0, 
             t = 0, mode = 0, line = 0, err = [], ws = "",  ltok = null, m; 
