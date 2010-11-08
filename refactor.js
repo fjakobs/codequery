@@ -9,16 +9,16 @@ console.log(Date.now() - n);
 // lets go and find our declare shit
 for(var i = 10;i<files.length;i++){
     var f = files[i];
-    var n = f.root.find("define([$a], function($b){$c})");
+    var n = f.root.scan("define([$a], function($b){$c})");
 	if(n.nt){
 	    var v = n.found;
 	    var deps = v.a.split(",", {ws:0}),
 	        args = v.b.split(",", {ws:0});
 	    n.replace("module.declare",1);
         v.a.pn.remove(3);
-        v.b.replace("require, exports, module");git 
-        n.ns.fc.find("function").replacews("");
-        v.c.find("return").replace("module.exports = ",1);
+        v.b.replace("require, exports, module");
+        n.ns.fc.scan("function").replacews("");
+        v.c.scan("return").replace("module.exports = ",1);
         
         for(var i = 0; i < args.length; i++)
             v.c.before( (i==0?"\n":"") + "    var " + args[i] + " = require(" + deps[i] + ");\n");

@@ -100,7 +100,7 @@
         
         function match(t1, t2, found){
            for(var n1 = t1, n2 = t2; (n1.nt && n2.nt); n1 = n1.ns, n2 = n2.ns){
-   			if(n2.nv == '{' && n2.fc.nt && n2.fc.nt==10){
+           	if(n2.nv == '{' && n2.fc.nt && n2.fc.nt==10){
    				if(!n2.rx) 
    					n2.rx = new RegExp(n2.fc.nv.slice(1,-1));
    				
@@ -171,15 +171,14 @@
             return n;
         }        
         
-        this.find = function(what, opt){
-            opt = opt || {};
+        function search(what, deep, all){
             var set = [this];
             if(!this.nt)
-                return opt.all?[]:end;
+                return all?[]:end;
             if(what.constructor == RegExp){
                var res = [];
                for(var i = 0;i<set.length;i++){
-    	    		matchrx(set[i], rx, deep, res);
+    	    		matchrx(set[i], rx, 0, res);
     	    	}
     	    	return opt.all?res:res[0];
         	} else {
@@ -188,12 +187,28 @@
     	    		var nw = parse(args[i],{noEOF:1});
     	    		var set2 = [];
     	    		for(var j = 0;j<set.length;j++){
-    	    			set2.push.apply(set2, scan(set[j], nw, opt.deep));
+    	    			set2.push.apply(set2, scan(set[j], nw, 0));
     	    		}
     	    		set = set2;
     	    	}
-    	    	return opt.all?set:(set[0]||end);
+    	    	return all?set:(set[0]||end);
     	    }
+        }
+        
+        this.scan = function(what){
+            return search(what, 0, 0);
+        }
+        
+        this.scanAll = function(what){
+            return search(what, 0, 1);
+        }
+        
+        this.find = function(what){
+            return search(what, 2, 0);
+        }
+        
+        this.findAll = function(what){
+            return search(what, 2, 1);
         }
          
         // split, does a token based split and serializes each chunk into an output array
