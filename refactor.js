@@ -3,14 +3,23 @@ var pu = require('./parseutil');
 
 var n = Date.now();
 //var files = pu.loadFiles("./apf", /\.js$/, /\_old/);
-var files = pu.loadFiles("../o3", /\.h$/, /\_old/, "c");
+var files = pu.loadFiles("../o3", /\.h$|.cpp$/, /\_old/, "c");
 
 console.log(Date.now() - n);
 
 // lets go and find our declare shit
-for(var i = 391;i<files.length;i++){
+for(var i = 0;i<files.length;i++){
     var f = files[i];
-    
+    console.log(i+' '+f.name);
+    var t = f.root.findAll("{/[\\w_-]+/}(){}");
+    if(t.length){
+        for(var j = 0;j<t.length;j++){
+            var n = t[j];
+            if(!n.nv.match(/^(if|while|for|case)$/))
+                console.log(n.nv+"("+n.ns.fc.toString({nows:1})+")");
+        }
+    }
+        /*
     var n = f.root.scan("define([$a], function($b){$c})");
 	if(n.nt){
 	    var v = n.found;
@@ -27,7 +36,7 @@ for(var i = 391;i<files.length;i++){
         console.log(f.root.toString());
         return;
 	}
-	    
+	    */
 	        
 	
     

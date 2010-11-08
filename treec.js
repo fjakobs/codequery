@@ -64,14 +64,18 @@
         this.ws = this.nv = "";
         this.pn = this.ps = this.fc = this.ns = end;
         
-        this.toString = function(s, l){
+        this.toString = function(opt, s, l){
+            if(!opt)opt = {};
             if(!s) s = [];
             if(!l) l = 0;
             if(this.nt){
                 for (var n = this; n.nt; n = n.ns) {
-                    s.push( n.ws + n.nv );
+                    opt.nows?
+                        s.push(n.nv ):
+                        s.push( n.ws + n.nv );
+                        
                     if (n.nt == 2)
-                        this.toString.call( n.fc, s, l + 1 );
+                        this.toString.call( n.fc, opt, s, l + 1 );
                 }
             }
             if(!l) return s.join('');
@@ -175,21 +179,21 @@
             if(!where.nt)
                 return all?[]:end;
             
-            var set = [this];
+            var set = [where];
             if(what.constructor == RegExp){
                var res = [];
                for(var i = 0;i<set.length;i++){
-    	    		matchrx(set[i], rx, 0, res);
+    	    		matchrx(set[i], rx, deep, res);
     	    	}
     	    	return opt.all?res:res[0];
         	} else {
     			var args = what.split("#");
     			for(var i = 0;i<args.length;i++){
     	    		var nw = parse(args[i],{noEOF:1});
-    	    		console.log(nw.dump());
+    	    		
     	    		var set2 = [];
     	    		for(var j = 0;j<set.length;j++){
-    	    			set2.push.apply(set2, scan(set[j], nw, 0));
+    	    			set2.push.apply(set2, scan(set[j], nw, deep));
     	    		}
     	    		set = set2;
     	    	}
