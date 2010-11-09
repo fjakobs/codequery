@@ -39,6 +39,11 @@
     var node = function(nt, p, l, ws, nv, pn, ps){
        this.nt = nt, this.p = p, this.l = l, this.ws = ws, this.nv = nv, this.pn = pn, this.ps = ps;
     };
+    var nodeSet =  function(set, prev){
+        this.prev = prev;
+        this.set = set, this.length = set.length;   
+    }
+        
     var end = new node(0, 0, 0, "", ""); end.pn = end.ps = end.ns = end.fc = end;
             
     (function(){
@@ -58,24 +63,23 @@
             newline:12,    // not in tree
             whitespace:13, // not in tree
             eof:14         // not in tree
-        }    
+        }
 
         this.nt = 0;
         this.ws = this.nv = "";
         this.pn = this.ps = this.fc = this.ns = end;
         
-        this.toString = function(opt, s, l){
-            if(!opt)opt = {};
+        this.toString = function(nows, s, l){
             if(!s) s = [];
             if(!l) l = 0;
             if(this.nt){
                 for (var n = this; n.nt; n = n.ns) {
-                    opt.nows?
+                    nows?
                         s.push(n.nv ):
                         s.push( n.ws + n.nv );
                         
                     if (n.nt == 2)
-                        this.toString.call( n.fc, opt, s, l + 1 );
+                        this.toString.call( n.fc, nows, s, l + 1 );
                 }
             }
             if(!l) return s.join('');
@@ -201,20 +205,24 @@
     	    }
         }
         
-        this.scan = function(what){
+        this.scanOne = function(what){
             return search(this, what, 0, 0);
         }
         
-        this.scanAll = function(what){
+        this.scan = function(what){
             return search(this, what, 0, 1);
         }
         
-        this.find = function(what){
+        this.findOne = function(what){
             return search(this, what, 2, 0);
         }
         
-        this.findAll = function(what){
+        this.find = function(what){
             return search(this, what, 2, 1);
+        }
+        
+        this.query = function(){
+            return new nodeSet([this]);
         }
          
         // split, does a token based split and serializes each chunk into an output array
@@ -233,32 +241,20 @@
             }
             return out;
         }
-        
-        // find and replace
-        this.findReplace = function(what, thing, len, opt){
-            var set = this.find(what, opt);
-            if(opt.all){
-                for(var i = 0;i<set.length;i++)
-                    set[i].replace(thing, len, opt);
-            }
-            else
-                set.replace(thing, len, opt);
-            return set;
-        }
-        
+
         // adds nodes before
-        this.before = function(thing, opt){
+        this.before = function(thing){
             insertNodes(this, false, parse(thing, {noEOF:1}) );    
             return this;
         }
         
         // adds nodes after
-        this.after = function(thing, opt){
+        this.after = function(thing){
             insertNodes(this, true, parse(thing, {noEOF:1}) );    
             return this;
         }
         // replaces a number of nodes
-        this.replace = function(thing, len, opt){
+        this.replace = function(thing, len){
             if(!this.nt) return;
             var n = this.ns;
             if(len==undefined || len<0) n = end;
@@ -328,8 +324,285 @@
             if(to.nt) // wire up last
                to.ps = m, m.ns = to;
         }
-
     }).call(node.prototype);
+
+    // jQuery like code-set
+    (function(){
+        
+        // Searching
+        this.find = function( what ){
+            var set = [];
+            for(var i = 0, s = this.set, l = s.length;i<l;i++){
+               set.push.apply( set, s[l].find( what ) );
+            }
+            return new nodeSet(set, this);
+        }
+        
+        this.scan = function( what ){
+            var set = [];
+                for(var i = 0, s = this.set, l = s.length;i<l;i++){
+                   set.push.apply( set, s[l].find( what ) );
+                }
+                return new nodeSet(set, this);
+            }
+        }
+        
+        // Misc
+        this.length = 0;
+        
+        this.size = function(){
+            return this.length;
+        }
+
+        this.toArray = function(){
+            return set.slice(0);
+        }
+        
+        // Traversal
+        function traverse(set, f, cb){
+            
+            var set = [], fm = function(){return true;}
+            if(f !== null && f!==undefined){
+	            if(f.constructor == RegExp){
+	                fm = function(n){ return n.nv.match(f); }
+	            } else if(f.constructor == String){
+	                fm = function(n){ return n.nv == f;}
+	            } else if (f.constructor == Function){
+	               fm = function(n,i){ return f.call(n,i);}
+	            }
+            }
+
+            for(var i = 0, s = this.set, l = s.length, n; i<l; i++){
+                n = s[l];
+                if(cb(n, set, fm))
+                    break;
+            }
+            return new nodeSet(set, this);
+        }
+
+        this.has = function(){
+            return traverse(this, null, function(n, set, i){
+                if(n.findOne(what)) set.push(n);
+            });
+        }
+        
+        this.next = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                if(n.ns.nt && fm(n.ns, i)) set.push(n.ns);
+            });
+        }
+        
+        this.nextAll = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                for(n = n.ns; n.nt; n = n.ns) 
+                    if(fm(n, i)) set.push(n);
+	        });
+        }
+        
+        this.nextUntil = function(f){
+	        return traverse(this, f, function(n, set, i, fm){
+	            for(n = n.ns; n.nt; n = n.ns){ 
+	                if(fm(n, i)) return; 
+	                set.push(n);
+	            }
+	        });
+        }
+        
+        this.siblings = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                var m = n, j = i;
+                for(var m = n.ns; m.nt; m = m.ns) 
+                    if(fm(n, i)) set.push(n);
+                for(var m = n; m.nt; m = m.ps) 
+                    if(fm(n, i)) set.push(n);
+            });
+        }
+        
+        this.prev = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                if(n.ps.nt && fm(n.ps, i)) set.push(n.ps);
+            })
+        }
+        
+        this.prevAll = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+			    for(n = n.ps; n.nt; n = n.ps) 
+			        if(fm(n, i)) set.push(n);
+			});
+	    }
+        
+        this.prevUntil = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+            for(n = n.ns; n.nt; n = n.ns){ 
+                if(fm(n, i)) return; 
+                set.push(n);
+            });
+        }
+        
+        this.parent = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                if(n.pn.nt && fm(n.pn, i)) 
+                    set.push(n.pn);
+            });
+        }
+        
+        this.child = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                if(n.fc.nt && fm(n.fc, i)) set.push(n.fc);
+            });
+        }
+        
+        this.parents = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                for(n = n.pn; n.nt; n = n.pn){ 
+                    if(fm(n, i)) set.push(n);
+                }
+            });
+        }
+        
+        this.filter = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                if(fm(n, i)) set.push(n);
+            }
+        }
+        
+        this.first = function(){
+            return new nodeSet( this.set.length==0?[]:[this.set[0]], this );
+        }
+        
+        this.last = function(){
+            return new nodeSet( this.set.length==0?[]:[this.set[this.length-1]], this );
+        }
+        
+        this.end = function(){
+            return this.prev;
+        }
+        
+        this.eq = function(i){
+            return new nodeSet( this.set.length<i?[]:[this.set[i]], this );
+        }
+        
+        this.slice = function(start, end){
+            return new nodeSet( this.set.slice(start,end), this );
+        }
+        
+        this.map = function(cb, f){
+            return traverse(this, f, function(n, set, i, fm){
+                if(fm(n, i)){
+                    var r = cb(n);
+                    if(r!==undefined) set.push(r);
+                }
+            }
+        }
+        
+        this.each = function(cb, f){
+            traverse(this, f, function(n, set, i, fm){
+                if(fm(n, i)) cb(n);
+            }
+            return this;
+        }
+        
+        // modification
+        this.before = function(thing){
+            insertNodes(this, false, parse(thing, {noEOF:1}) );    
+            return this;
+        }
+        
+        // adds nodes after
+        this.after = function(thing){
+            insertNodes(this, true, parse(thing, {noEOF:1}) );    
+            return this;
+        }
+        
+        // replaces a number of nodes
+        this.after = function(thing, f){
+             traverse(this, f, function(n, set, i, fm){
+                 if(fm(n, i)) n.after(thing);
+             })
+             return this;
+        }
+        
+        this.before = function(thing, f){
+            traverse(this, f, function(n, set, i, fm){
+                if(fm(n, i)) n.before(thing);
+            })
+            return this;
+        }
+        
+        this.remove = function(len, f){
+            traverse(this, f, function(n, set, i, fm){
+                if(fm(n, i)) n.remove(len);
+            })
+            return this;            
+        }
+        
+        this.replace = function(thing, len, f){
+            traverse(this, f, function(n, set, i, fm){
+                if(fm(n, i))  n.replace(len);
+            })
+            return this;                     
+        }
+        
+        
+        // value access
+        this.ws = function(set){
+            if(set!==undefined){ // read
+               var out = [];
+	            traverse(this, null, function(n, set, i, fm){
+				    out.push(n.ws);
+				})
+				return out.join('');
+            } 
+            traverse(this, null, function(n, set, i, fm){
+                n.ws = set;
+            });
+            return this;
+        }
+        
+        this.text = function(){
+            
+        }
+        
+        this.val = function(set){
+            if(set !== undefined){
+                if(set.length==0) return this;
+                set[0].nv = set;
+                return this;
+            }
+            else 
+            return set[0].split(tok);
+        }
+        
+        this.values = function(set, f){
+            if(set !== undefined){
+                traverse(this, null, function(n, set, i, fm){
+	                n.ns = set;
+	            })
+	            return this;
+	        } else {
+	           var out = [];
+               traverse(this, null, function(n, set, i, fm){
+	               n.ns = set;
+	           })
+	           return this;
+	        }
+        }
+        
+        this.split = function(tok){
+            if(set.length == 0) return [];
+            return set[0].split(tok);
+        }
+        
+        this.serialize =
+        this.toString = function(nows, f){
+            var out = [];
+            traverse(this, f, function(n, set, i, fm){
+                if(fm(n, i))  out.push(n.toString(nows));
+            }
+            return out.join('');
+        }
+        
+    }).call(nodeSet.prototype);
     
     
     var lut = {'"': 9, '\'': 9, '[': 2, ']': 3, '{': 2, '}': 3, '(': 2, ')': 3,'\n': 12, '\r\n': 12, '//': 1, '/*': 1, '*/': 1, '/':10};/**/
