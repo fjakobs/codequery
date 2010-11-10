@@ -39,10 +39,10 @@
     var node = function(nt, p, l, ws, nv, pn, ps){
        this.nt = nt, this.p = p, this.l = l, this.ws = ws, this.nv = nv, this.pn = pn, this.ps = ps;
     };
-    var nodeSet =  function(set, prev){
-        this.prev = prev;
+    var nodeSet =  function(set, chain){
+        this.chain = chain;
         this.set = set, this.length = set.length;   
-    }
+    };
         
     var end = new node(0, 0, 0, "", ""); end.pn = end.ps = end.ns = end.fc = end;
             
@@ -210,7 +210,7 @@
         }
         
         this.scan = function(what){
-            return search(this, what, 0, 1);
+            return nodeSet(search(this, what, 0, 1));
         }
         
         this.findOne = function(what){
@@ -218,7 +218,7 @@
         }
         
         this.find = function(what){
-            return search(this, what, 2, 1);
+            return new nodeSet(search(this, what, 2, 1));
         }
         
         this.query = function(){
@@ -340,16 +340,13 @@
         
         this.scan = function( what ){
             var set = [];
-                for(var i = 0, s = this.set, l = s.length;i<l;i++){
-                   set.push.apply( set, s[l].find( what ) );
-                }
-                return new nodeSet(set, this);
+            for(var i = 0, s = this.set, l = s.length;i<l;i++){
+               set.push.apply( set, s[l].find( what ) );
             }
+            return new nodeSet(set, this);
         }
         
         // Misc
-        this.length = 0;
-        
         this.size = function(){
             return this.length;
         }
@@ -359,7 +356,7 @@
         }
         
         // Traversal
-        function traverse(set, f, cb){
+        function traverse(pthis, f, cb){
             
             var set = [], fm = function(){return true;}
             if(f !== null && f!==undefined){
@@ -372,9 +369,9 @@
 	            }
             }
 
-            for(var i = 0, s = this.set, l = s.length, n; i<l; i++){
-                n = s[l];
-                if(cb(n, set, fm))
+            for(var i = 0, s = pthis.set, l = s.length, n; i<l; i++){
+                n = s[i];
+                if(cb(n, set, i, fm))
                     break;
             }
             return new nodeSet(set, this);
@@ -433,9 +430,10 @@
         
         this.prevUntil = function(f){
             return traverse(this, f, function(n, set, i, fm){
-            for(n = n.ns; n.nt; n = n.ns){ 
-                if(fm(n, i)) return; 
-                set.push(n);
+                for(n = n.ns; n.nt; n = n.ns){ 
+                    if(fm(n, i)) return; 
+                    set.push(n);
+                }
             });
         }
         
@@ -463,7 +461,13 @@
         this.filter = function(f){
             return traverse(this, f, function(n, set, i, fm){
                 if(fm(n, i)) set.push(n);
-            }
+            });
+        }
+        
+        this.not = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                if(!fm(n, i)) set.push(n);
+            });
         }
         
         this.first = function(){
@@ -475,7 +479,7 @@
         }
         
         this.end = function(){
-            return this.prev;
+            return this.chain;
         }
         
         this.eq = function(i){
@@ -492,13 +496,14 @@
                     var r = cb(n);
                     if(r!==undefined) set.push(r);
                 }
-            }
+            });
         }
         
         this.each = function(cb, f){
             traverse(this, f, function(n, set, i, fm){
+                
                 if(fm(n, i)) cb(n);
-            }
+            });
             return this;
         }
         
@@ -560,7 +565,6 @@
         }
         
         this.text = function(){
-            
         }
         
         this.val = function(set){
@@ -571,6 +575,10 @@
             }
             else 
             return set[0].split(tok);
+        }
+        
+        this.nodes = function(set, f){
+            // we can replace our entire nodeset   
         }
         
         this.values = function(set, f){
@@ -598,7 +606,7 @@
             var out = [];
             traverse(this, f, function(n, set, i, fm){
                 if(fm(n, i))  out.push(n.toString(nows));
-            }
+            });
             return out.join('');
         }
         

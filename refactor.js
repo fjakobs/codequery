@@ -1,25 +1,26 @@
 var parser = require("./treec");
 var pu = require('./parseutil');
 
-var n = Date.now();
-//var files = pu.loadFiles("./apf", /\.js$/, /\_old/);
-var files = pu.loadFiles("../o3", /\.h$|.cpp$/, /\_old/, "c");
+var files = pu.loadFiles("./apf", /\.js$/, /\_old/, "js");
 
-console.log(Date.now() - n);
+var fns = {};
 
-// lets go and find our declare shit
 for(var i = 0;i<files.length;i++){
     var f = files[i];
-    console.log(i+' '+f.name);
-    var t = f.root.findAll("{/[\\w_-]+/}(){}");
-    if(t.length){
-        for(var j = 0;j<t.length;j++){
-            var n = t[j];
-            if(!n.nv.match(/^(if|while|for|case)$/))
-                console.log(n.nv+"("+n.ns.fc.toString({nows:1})+")");
-        }
-    }
-        /*
+    
+	f.root.find("($a){}").prev().filter(/^\w+$/).not(/if|when|for|while/).each(function(n){
+        fns[n.nv] = 1;    	   
+	});
+}
+for(k in fns){
+    console.log(k+'()');
+}
+
+console.log( files[384].root.dump() );
+
+
+/*
+    
     var n = f.root.scan("define([$a], function($b){$c})");
 	if(n.nt){
 	    var v = n.found;
@@ -36,10 +37,8 @@ for(var i = 0;i<files.length;i++){
         console.log(f.root.toString());
         return;
 	}
-	    */
-	        
 	
-    
+*/    
 	// if we are finding stuff with markers, how do we get to the markers?
 	// alright now i want to do some useful querying
 	// operations we'd wanna do...
@@ -50,7 +49,7 @@ for(var i = 0;i<files.length;i++){
 	// js.add("var "+args[0]+" = "+deps[0]+";\n", code);
 	// console.log(js.serialize(args));
 	//  }
-}
+//}
 
 console.log("END");
 
