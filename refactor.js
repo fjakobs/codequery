@@ -1,44 +1,34 @@
-var parser = require("./treec");
+var cq = require("./codequery");
 var pu = require('./parseutil');
 
 var files = pu.loadFiles("./apf", /\.js$/, /\_old/, "js");
-
 var fns = {};
-
-for(var i = 0;i<files.length;i++){
-    var f = files[i];
-    
-	f.root.find("($a){}").prev().filter(/^\w+$/).not(/if|when|for|while/).each(function(n){
-        fns[n.nv] = 1;    	   
-	});
-}
-for(k in fns){
-    console.log(k+'()');
-}
-
-console.log( files[384].root.dump() );
-
-
 /*
-    
-    var n = f.root.scan("define([$a], function($b){$c})");
-	if(n.nt){
-	    var v = n.found;
-	    var deps = v.a.split(",", {ws:0}),
-	        args = v.b.split(",", {ws:0});
-	    n.replace("module.declare",1);
-        v.a.pn.remove(3);
-        v.b.replace("require, exports, module");
-        n.ns.fc.scan("function").replacews("");
-        v.c.scan("return").replace("module.exports = ", 1);
+f.root.find("($a){}").prev().filter(/^\w+$/).not(/if|when|for|while/).each(function(n){
+    fns[n.nv] = 1;
+});
+*/
+//console.log( files[384].root.dump() );
+
+files.forEach(function(f){
+    f.root.scan("define([<dep>], function<fn>(<arg>){<code>})").each(function(i,v,m){
         
-        for(var i = 0; i < args.length; i++)
-            v.c.before( (i==0?"\n":"") + "    var " + args[i] + " = require(" + deps[i] + ");\n");
-        console.log(f.root.toString());
-        return;
-	}
-	
-*/    
+	   var deps = m.dep.child().split(",", {ws:0}),
+	       args = m.arg.child().split(",", {ws:0});
+	   this.replace("module.declare", 1);
+
+	   m.dep.remove(3);
+	   m.arg.replace("(require, exports, module)",2);
+	   m.fn.ws("");
+	   m.code.child().scan("return").nextFilter(/\{|\(|\w+/).replace("module.exports = ", 1);
+	   
+	   for(var i = 0; i < args.length; i++)
+	       m.code.before( (i==0?"\n":"") + "    var " + args[i] + " = require(" + deps[i] + ");\n");
+       
+	}).empty(function(){
+	   console.log("FAIL ON: "+f.name);
+	});
+});
 	// if we are finding stuff with markers, how do we get to the markers?
 	// alright now i want to do some useful querying
 	// operations we'd wanna do...
