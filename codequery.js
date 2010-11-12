@@ -115,20 +115,19 @@
         }
         
         function match(t1, t2, found){
-           for(var n1 = t1, n2 = t2; (n1.nt && n2.nt); n1 = n1.ns, n2 = n2.ns){
-
+           for(var l1, n1 = t1, n2 = t2; (n1.nt && n2.nt); n1 = n1.ns, n2 = n2.ns){
+               l1 = n1;
        		if(n2.nv == '<' && n2.ns.ns.nv == '>'){
                	if(n2.ns.nt == 10){ // match with regexp
 	   				if(!n2.rx) 
 	   					n2.rx = new RegExp(n2.ns.nv.slice(1,-1));
-	   				
+	   					
 	   				if(!n1.nv.match( n2.rx ))
 	   					break;
-	   				if(!n2.ns)console.log(n2);
-	   				
-	   				n2 = n2.ns.ns, n1 = n1.ps;
+
+	   				n2 = n2.ns.ns;
 	   				continue;
-               	} else if(n2.ns.nv.match(/^[\w$_]+$/)){ // store tempvar
+               	} else { // store tempvar
                	    var k = n2.ns.nv; 
                	    (found[k] || (found[k] = new nodeSet([]))).set.push(n1.ps);
        				n2 = n2.ns.ns, n1 = n1.ps;
@@ -154,6 +153,11 @@
    				if(!n2.ns) return n1.fc;
    			}
        	}
+       	if(n2.nv == '<' && n2.ns.ns.nv == '>' && !n2.ns.ns.ns.nt){
+       	    var k = n2.ns.nv; 
+       	    (found[k] || (found[k] = new nodeSet([]))).set.push(l1);
+       	    return t1;
+       	}
    		if(!n2.nt)
    			return t1;
        }
@@ -167,9 +171,13 @@
        		var m = match(n, t2, found);
            	
        		if(m){
-       		    m.found = found;
-       			results.push(m);
-       		}
+       		    if(found['$']){
+       		       results.push.apply(results, found['$'].set);
+       		    } else {
+	       		    m.found = found;
+	       			results.push(m);
+       		    }
+        	   }
        		if(n.nt == 2 && deep){
            		if(deep!=1 || 
            		  !(n.nv=='{' && (n.ps.ps.ps.nv=='function' || n.ps.ps.ps.ps.nv=='function')))
@@ -693,7 +701,7 @@
         
     // tokenizer RX, looks to be complete but might miss a few odd ones
     var rx = /(\r?[\n]|\/[\/*]|\*\/|["'{(\[\])}\]\/])|([ \x7F\t]+)|([#\w\$._\x80-\xFF\u0080-\uFFFF])+|([!+-/<>^*]?[\=]+|::|>>|<<|->|>>=|<<=|[+]{2}|[-]{2}|&&|[|]{2}|\\?[\w._?,:;!=+-\\\/^&|*"'[\]{}()%$#@~`<>])|$/g;/**/
-    var pre_rx  = {'throw': 1, 'return': 1, '(': 1, '[': 1, '{':1, ',': 1, '=': 1, ":": 1};
+    var pre_rx  = {'throw': 1, 'return': 1, '(': 1, '[': 1, '{':1, ',': 1, '=': 1, ":": 1, "<":1};
     
     exports.jskeywords = {
         "!":4,"%":4,"&":4,"*":4,"--":4,"-":4,"++":4,"+":4,"~":4,"===":4,"==":4,

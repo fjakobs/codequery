@@ -20,10 +20,34 @@ files.forEach(function(f){
 	   m.dep.remove(3);
 	   m.arg.replace("(require, exports, module)",2);
 	   m.fn.ws("");
-	   m.code.child().scan("return").nextFilter(/\{|\(|[\w$_]+/).replace("module.exports = ", 1);
+	   m.code.child().scan("return").nextFilter(/\{|\(|[\w$_]+/).replace("module.exports =", 1).empty(function(){
+	      console.log("NO EXPORT"+f.name+":1")
+	   });
 	   
 	   for(var i = 0; i < args.length; i++)
 	       m.code.before( (i==0?"\n":"") + "    var " + args[i] + " = require(" + deps[i] + ");\n");
+       
+       /*
+            module.exports = {
+                a:b
+            }
+            
+            (function(){
+                this.bla = bla;
+            }).call(someClass.prototype)
+            module.exports = someClass;
+            
+            var x = {
+                a:b
+            }
+            module.exports = x;
+       */
+       //if(f.name.match(/cache/)){
+         //  console.log(f.root.toString());
+           // the exports:
+           f.root.scan('module.declare(function(){<$>})').child()
+                 .scan('module.exports = </.*/><$>').empty(function(){console.log(f.name)});//.log();
+      // }
        
 	}).empty(function(){
 	   console.log("FAIL ON: "+f.name);
