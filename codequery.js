@@ -201,25 +201,26 @@
             if(!where.nt)
                 return all?[]:end;
             
-            var set = [where];
             if(what.constructor == RegExp){
                var res = [];
                for(var i = 0;i<set.length;i++){
-    	    		matchrx(set[i], rx, deep, res);
+    	    		matchrx(where, rx, deep, res);
     	    	}
-    	    	return opt.all?res:res[0];
+    	    	return opt.all?res:(res[0]||end);
         	} else {
-    			var args = what.split("#");
+        	    var res = [];
+    			var args = what.split("||");
     			for(var i = 0;i<args.length;i++){
     	    		var nw = parse(args[i],{noEOF:1});
+    	    		var out = [];
+    	    		scan(where, nw, deep, out);
     	    		
-    	    		var set2 = [];
-    	    		for(var j = 0;j<set.length;j++){
-    	    			set2.push.apply(set2, scan(set[j], nw, deep));
-    	    		}
-    	    		set = set2;
+    	    		for(var j = 0;j<out.length;j++){
+    	    		    out[j].orPart = i;
+    	    		    res.push(out[j]);
+   	    		}
     	    	}
-    	    	return all?set:(set[0]||end);
+    	    	return all?res:(res[0]||end);
     	    }
         }
         

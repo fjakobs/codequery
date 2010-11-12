@@ -20,7 +20,7 @@ files.forEach(function(f){
 	   m.dep.remove(3);
 	   m.arg.replace("(require, exports, module)",2);
 	   m.fn.ws("");
-	   m.code.child().scan("return").nextFilter(/\{|\(|\w+/).replace("module.exports = ", 1);
+	   m.code.child().scan("return").nextFilter(/\{|\(|[\w$_]+/).replace("module.exports = ", 1);
 	   
 	   for(var i = 0; i < args.length; i++)
 	       m.code.before( (i==0?"\n":"") + "    var " + args[i] + " = require(" + deps[i] + ");\n");
