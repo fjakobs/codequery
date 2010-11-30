@@ -67,17 +67,17 @@
         this.ws = this.nv = "";
         this.pn = this.ps = this.fc = this.ns = end;
         
-        this.toString = function(nows, s, l){
+        this.toString = function(nows, c, s, l){
             if(!s) s = [];
             if(!l) l = 0;
             if(this.nt){
                 for (var n = this; n.nt; n = n.ns) {
-                    nows?
-                        s.push(n.nv ):
-                        s.push( n.ws + n.nv );
+                    nows?(nows==2?s.push((n.ws?' ':'')+n.nv):s.push(n.nv)):s.push( n.ws + n.nv );
                         
                     if (n.nt == 2)
-                        this.toString.call( n.fc, nows, s, l + 1 );
+                        this.toString.call( n.fc, nows, 0, s, l + 1 );
+                    if(c==1) break;
+                    c--;
                 }
             }
             if(!l) return s.join('');
@@ -162,11 +162,13 @@
    			return t1;
        }
        
-       function scan(t1, t2, deep, results, l){
+       function scan(t1, t2, deep, results, l, fm){
        	if(!results) results = [];
        	if(!l) l = 0;
            
        	for (var n = t1; n.nt; n = n.ns) {
+               if(fm && fm(n))break;
+       	    
        	    var found = {};
        		var m = match(n, t2, found);
            	
@@ -187,12 +189,13 @@
        	if(!l)return results;
        }
    
-       function scanrx(t, rx, deep, results){
+       function scanrx(t, rx, deep, results, fm){
            for(var n = t;n.nt;n = n.ns){
+               if(fm && fm(n))break;
        		if(n.nv.match(rx))
        			results.push(n);
    			if(n.nt == 2 && n.fc.nt && deep){
-   				matchrx(n.fc, rx, deep, results);
+   				scanrx(n.fc, rx, deep, results);
    			}
    		}
        }
@@ -205,23 +208,21 @@
             return n;
         }        
         
-        function search(where, what, deep, all){
+        function search(where, what, deep, all, fm){
             if(!where.nt)
                 return all?[]:end;
             
             if(what.constructor == RegExp){
-               var res = [];
-               for(var i = 0;i<set.length;i++){
-    	    		matchrx(where, rx, deep, res);
-    	    	}
-    	    	return opt.all?res:(res[0]||end);
+                var res = [];
+        		scanrx(where, what, deep, res, fm);
+    	    	return all?res:(res[0]||end);
         	} else {
         	    var res = [];
     			var args = what.split("||");
     			for(var i = 0;i<args.length;i++){
     	    		var nw = parse(args[i],{noEOF:1});
     	    		var out = [];
-    	    		scan(where, nw, deep, out);
+    	    		scan(where, nw, deep, out, 0, fm);
     	    		
     	    		for(var j = 0;j<out.length;j++){
     	    		    out[j].orPart = i;
@@ -232,20 +233,20 @@
     	    }
         }
         
-        this.scanOne = function(what){
-            return search(this, what, 0, 0);
+        this.scanOne = function(what, f){
+            return search(this, what, 0, 0, f?filterFunc(f):null);
         }
         
-        this.scan = function(what){
-            return new nodeSet(search(this, what, 0, 1));
+        this.scan = function(what, f){
+            return new nodeSet(search(this, what, 0, 1, f?filterFunc(f):null));
         }
         
-        this.findOne = function(what){
-            return search(this, what, 2, 0);
+        this.findOne = function(what, f){
+            return search(this, what, 2, 0, f?filterFunc(f):null);
         }
         
-        this.find = function(what){
-            return new nodeSet(search(this, what, 2, 1));
+        this.find = function(what, f){
+            return new nodeSet(search(this, what, 2, 1, f?filterFunc(f):null));
         }
         
         this.query = function(){
@@ -253,15 +254,15 @@
         }
          
         // split, does a token based split and serializes each chunk into an output array
-        this.split = function(token, opt){
-            var ws = opt?opt.ws:true;
+        this.split = function(token, nows){
             var out = [];
             for(var n = this;n.nt; n = n.ns){
                 // scan to next token outputting data
                 for(var s = [];n.nt && n.nv != token; n = n.ns){
-                    s.push( ws?(n.ws+n.nv):n.nv );
+                    
+                    s.push( nows?(nows==2?(((n.ws&&s.length)?' ':'')+n.nv):n.nv):(n.ws+n.nv) );
                     if (n.nt == 2)
-                        this.toString.call( n.fc, s, l + 1 );                
+                        n.fc.toString(nows, 0, s, 1 );                
                 }
                 if(s.length)
                     out.push(s.join(''));
@@ -360,20 +361,37 @@
     (function(){
         
         // Searching
-        this.find = function( what ){
+        this.find = function( what, f ){
             var set = [];
             for(var i = 0, s = this.set, l = s.length;i<l;i++){
-               set.push.apply( set, s[i].find( what ).set );
+               set.push.apply( set, s[i].find( what, f ).set );
             }
             return new nodeSet(set, this);
         }
         
-        this.scan = function( what ){
+        // Searching
+        this.findOne = function( what, f ){
             var set = [];
             for(var i = 0, s = this.set, l = s.length;i<l;i++){
-               set.push.apply( set, s[i].scan( what ).set );
+               set.push( s[i].findOne( what, f ) );
             }
             return new nodeSet(set, this);
+        }        
+        
+        this.scan = function( what, f ){
+            var set = [];
+            for(var i = 0, s = this.set, l = s.length;i<l;i++){
+               set.push.apply( set, s[i].scan( what, f ).set );
+            }
+            return new nodeSet(set, this);
+        }
+        
+        this.scanOne = function( what, f ){
+	        var set = [];
+	        for(var i = 0, s = this.set, l = s.length;i<l;i++){
+	           set.push( s[i].scanOne( what, f ) );
+	        }
+	        return new nodeSet(set, this);
         }
         
         // Misc
@@ -385,27 +403,25 @@
             return this.set.slice(0);
         }
         
+        this.filled = function(cb){
+            if(cb){
+                   if(this.set.length != 0) cb.call(this,this);        
+                   return this;
+           }
+           return this.set.length != 0;   
+        }
+        
         this.empty = function(cb){
             if(cb){
-                if(this.set.length == 0) cb();        
+                if(this.set.length == 0) cb.call(this,this);      
                 return this;
             }
             return this.set.length == 0;   
         }
         
-        // Traversal
         function traverse(pthis, f, cb){
             
-            var set = [], fm = function(){return true;}
-            if(f !== null && f!==undefined){
-	            if(f.constructor == RegExp){
-	                fm = function(n){ return n.nv.match(f); }
-	            } else if(f.constructor == String){
-	                fm = function(n){ return n.nv == f;}
-	            } else if (f.constructor == Function){
-	               fm = function(n,i){ return f.call(n,i);}
-	            }
-            }
+            var set = [], fm = filterFunc(f);
 
             for(var i = 0, s = pthis.set, l = s.length, n; i<l; i++){
                 n = s[i];
@@ -415,7 +431,7 @@
             return new nodeSet(set, pthis);
         }
 
-        this.has = function(){
+        this.has = function(what){
             return traverse(this, null, function(n, set, i){
                 if(n.findOne(what)) set.push(n);
             });
@@ -465,6 +481,20 @@
             });
         }
         
+        this.lastSibling = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                for(;n.ns.nt;n = n.ns);
+                if(n.nt && fm(n, i)) set.push(n);
+            })
+        }
+        
+        this.firstSibling = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                for(;n.ps.nt;n = n.ps);
+                if(n.nt && fm(n, i)) set.push(n);
+            })
+        }
+        
         this.prev = function(f){
             return traverse(this, f, function(n, set, i, fm){
                 if(n.ps.nt && fm(n.ps, i)) set.push(n.ps);
@@ -480,9 +510,20 @@
         
         this.prevUntil = function(f){
             return traverse(this, f, function(n, set, i, fm){
-                for(n = n.ns; n.nt; n = n.ns){ 
+                for(n = n.ps; n.nt; n = n.ps){ 
                     if(fm(n, i)) return; 
                     set.push(n);
+                }
+            });
+        }
+        
+       this.prevScan = function(f){
+            return traverse(this, f, function(n, set, i, fm){
+                for(n = n.ps; n.nt; n = n.ps){ 
+                    if(fm(n, i)){
+                        set.push(n);
+                        return;
+                    }
                 }
             });
         }
@@ -520,12 +561,22 @@
             });
         }
         
-        this.first = function(){
+        this.first = function(cb){
+            if(cb){
+                if(this.set.length>0)
+                    cb.call(this.set[0],this.set[0]);
+                return this;   
+            }
             return new nodeSet( this.set.length==0?[]:[this.set[0]], this );
         }
         
-        this.last = function(){
-            return new nodeSet( this.set.length==0?[]:[this.set[this.length-1]], this );
+        this.last = function(cb){
+            if(cb){
+                if(this.set.length>0)
+                    cb.call(this.set[this.set.length-1],this.set[this.set.length-1]);
+                return this;   
+            }    
+            return new nodeSet( this.set.length==0?[]:[this.set[this.set.length-1]], this );
         }
         
         this.end = function(){
@@ -533,7 +584,7 @@
         }
         
         this.eq = function(i){
-            return new nodeSet( this.set.length<i?[]:[this.set[i]], this );
+            return new nodeSet( this.set.length<=i?[]:[this.set[i]], this );
         }
         
         this.slice = function(start, end){
@@ -557,7 +608,7 @@
             return this;
         }
         
-        this.dump = function(f){
+        this.dump1 = function(f){
             var s = [];
             traverse(this, f, function(n, set, i, fm){
                 if(fm(n, i))
@@ -566,9 +617,18 @@
             return s.join('\n');
         }
         
+        this.dump = function(f){
+	        var s = [];
+	        traverse(this, f, function(n, set, i, fm){
+	            if(fm(n, i))
+	                s.push("--------- item: "+i+"-------\n"+n.dump());
+	        });
+	        return s.join('\n');
+        }
+        
         this.each = function(cb, f){
             traverse(this, f, function(n, set, i, fm){
-                if(fm(n, i)) cb.call(n,i,n.nv,n.found);
+                if(fm(n, i)) cb.call(n,n,n.found,i,n.nv);
             });
             return this;
         }
@@ -636,7 +696,7 @@
                 this.set[0].nv = set;
                 return this;
             }
-            return this.set[0].split(tok);
+            return this.set.length?this.set[0].nv:"";//(tok);
         }
         
         this.node = function(){
@@ -671,31 +731,57 @@
 	        }
         }
         
-        this.split = function(tok, f){
+        this.split = function(tok, nows, f){
             if(this.set.length == 0) return [];
             
             var out = [];
             traverse(this, f, function(n, set, i, fm){
-                var sub = [];
                 if(fm(n, i))  
-                    n.split(sub);
-                out.push.apply(out, sub); 
+                    out.push.apply(out,n.split(tok, nows));
             });
             return out;
         }
         
-        this.serialize =
-        this.toString = function(nows, f){
+        this.serializePrevUntil = function(nows,f){
             var out = [];
             traverse(this, f, function(n, set, i, fm){
-                if(fm(n, i))  out.push(n.toString(nows));
+	            for(;n.nt; n = n.ps){ 
+                    var b = n.ps.nt?fm(n.ps,i):true;
+	                out.unshift(n.toString(b?(nows?1:0):nows,1));
+	                if(b) return;
+	            }
+            });
+            return out.join('');
+        }
+        
+        this.serialize =
+        this.toString = function(nows, len, f){
+            var out = [];
+            traverse(this, f, function(n, set, i, fm){
+                if(fm(n, i))  out.push(n.toString(out.length?nows:(nows?1:0),len));
             });
             return out.join('');
         }
         
     }).call(nodeSet.prototype);
     
-    
+    function filterFunc(f){
+        var fm = function(){return true;};
+        if(f !== null && f!==undefined){
+            if(f.constructor == RegExp){
+                fm = function(n){ return n.nv.match(f); }
+            } else if(f.constructor == String){
+                fm = function(n){ return n.nv == f;}
+            } else if (f.constructor == Function){
+               fm = function(n,i){ return f.call(n,i);}
+            } else if (f === false){
+                fm = function(n,i){ return false; }
+            }
+        }
+        return fm;
+    }
+        
+        
     var lut = {'"': 9, '\'': 9, '[': 2, ']': 3, '{': 2, '}': 3, '(': 2, ')': 3,'\n': 12, '\r\n': 12, '//': 1, '/*': 1, '*/': 1, '/':10};/**/
     var close  = {'}': '{', ']': '[', ')': '('};
         
@@ -855,7 +941,7 @@
             else n.ps.ns = end;
         } 
         if(root.ns)
-           root = root.ns, root.ps = null;
+           root = root.ns, root.ps = end;
         if (mode)
             err.push(n);
        
